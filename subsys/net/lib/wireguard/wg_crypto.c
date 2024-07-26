@@ -273,17 +273,16 @@ static void wg_clamp_private_key(uint8_t *key)
 
 static void wg_generate_private_key(uint8_t *key)
 {
-	(void)sys_csrand_get(key, WG_PRIVATE_KEY_LEN);
+	(void)wg_psa_random(key, WG_PRIVATE_KEY_LEN);
 	wg_clamp_private_key(key);
 }
 
 static bool wg_generate_public_key(uint8_t *public_key, const uint8_t *private_key)
 {
-	static const uint8_t basepoint[WG_PUBLIC_KEY_LEN] = { 9 };
 	bool ret = false;
 
 	if (memcmp(private_key, zero_key, WG_PUBLIC_KEY_LEN) != 0) {
-		ret = (wireguard_x25519(public_key, private_key, basepoint) == 0);
+		ret = (wg_psa_x25519_public_key(public_key, private_key) == 0);
 	}
 
 	return ret;
@@ -306,7 +305,7 @@ static bool wg_check_mac1(struct wg_iface_context *ctx,
 
 static void wg_generate_cookie_secret(struct wg_iface_context *ctx, uint32_t lifetime_in_ms)
 {
-	(void)sys_csrand_get(ctx->cookie_secret, sizeof(ctx->cookie_secret));
+	(void)wg_psa_random(ctx->cookie_secret, sizeof(ctx->cookie_secret));
 
 	ctx->cookie_secret_expires = sys_timepoint_calc(K_MSEC(lifetime_in_ms));
 }
@@ -933,7 +932,7 @@ static void wg_create_cookie_reply(struct wg_iface_context *ctx,
 	dst->type = MESSAGE_COOKIE_REPLY;
 	dst->receiver = index;
 
-	(void)sys_csrand_get(dst->nonce, WG_COOKIE_NONCE_LEN);
+	(void)wg_psa_random(dst->nonce, WG_COOKIE_NONCE_LEN);
 
 	generate_peer_cookie(ctx, cookie, source_addr_port, source_length);
 

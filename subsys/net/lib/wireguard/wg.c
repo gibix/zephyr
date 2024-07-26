@@ -1803,7 +1803,7 @@ static uint32_t generate_unique_index(struct wg_iface_context *ctx)
 
 	do {
 		do {
-			(void)sys_csrand_get(&index, sizeof(index));
+			(void)wg_psa_random((uint8_t *)&index, sizeof(index));
 		} while ((index == 0) || (index == 0xFFFFFFFF));
 
 	} while (is_index_used(ctx, index));
