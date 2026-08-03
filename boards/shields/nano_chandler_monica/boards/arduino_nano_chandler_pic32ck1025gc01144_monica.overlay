@@ -1,0 +1,18 @@
+/*
+ * Copyright (c) 2026 Arduino SA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <zephyr/dt-bindings/gpio/gpio.h>
+
+/*
+ * ESP8266 WiFi module on UART1 (sercom1). D7 (&portd 11) is the module's
+ * RESET/CH_PD line.
+ */
+&sercom1 {
+	esp8266: esp8266 {
+		compatible = "espressif,esp-at";
+		reset-gpios = <&portd 11 GPIO_ACTIVE_LOW>;
+	};
+};

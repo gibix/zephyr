@@ -1,0 +1,18 @@
+identifier: arduino_nano_chandler/pic32ck1025gc01144/monica
+name: Arduino Nano Chandler Monica
+type: mcu
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+ram: 256
+flash: 1024
+supported:
+  - clock_control
+  - gpio
+  - pinctrl
+  - uart
+  - usbd
+  - eth
+  - wifi
+vendor: arduino

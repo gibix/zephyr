@@ -4,3 +4,5 @@ board:
   vendor: arduino
   socs:
     - name: pic32ck1025gc01144
+      variants:
+        - name: monica
