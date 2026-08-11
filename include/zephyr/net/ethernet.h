@@ -17,6 +17,7 @@
 #include <zephyr/types.h>
 #include <stdbool.h>
 #include <zephyr/sys/atomic.h>
+#include <zephyr/sys/byteorder.h>
 
 #include <zephyr/net/net_ip.h>
 #include <zephyr/net/net_pkt.h>
@@ -1285,6 +1286,11 @@ struct net_eth_mac_config {
 	 * @kconfig_dep{CONFIG_NVMEM}
 	 */
 	struct nvmem_cell cell;
+	/**
+	 * The NVMEM cell stores the address in reverse octet order
+	 * @kconfig_dep{CONFIG_NVMEM}
+	 */
+	bool cell_reversed;
 #endif
 };
 
@@ -1324,8 +1330,14 @@ static inline int net_eth_mac_load(const struct net_eth_mac_config *cfg, uint8_t
 
 #if defined(CONFIG_NVMEM)
 	if (cfg->type == NET_ETH_MAC_NVMEM) {
-		return nvmem_cell_read(&cfg->cell, &mac_addr[cfg->addr_len], 0,
-				       NET_ETH_ADDR_LEN - cfg->addr_len);
+		size_t len = NET_ETH_ADDR_LEN - cfg->addr_len;
+		int ret = nvmem_cell_read(&cfg->cell, &mac_addr[cfg->addr_len], 0, len);
+
+		if (ret == 0 && cfg->cell_reversed) {
+			sys_mem_swap(&mac_addr[cfg->addr_len], len);
+		}
+
+		return ret;
 	}
 #endif
 
@@ -1346,7 +1358,8 @@ static inline int net_eth_mac_load(const struct net_eth_mac_config *cfg, uint8_t
  * @param node_id Node identifier.
  */
 #define Z_NET_ETH_MAC_DEV_CONFIG_INIT_CELL(node_id)                                                \
-	.cell = NVMEM_CELL_GET_BY_NAME_OR(node_id, mac_address, {0}),
+	.cell = NVMEM_CELL_GET_BY_NAME_OR(node_id, mac_address, {0}),                               \
+	.cell_reversed = DT_PROP(node_id, zephyr_mac_address_reversed),
 #else
 #define Z_NET_ETH_MAC_DEV_CONFIG_INIT_CELL(node_id)
 #endif

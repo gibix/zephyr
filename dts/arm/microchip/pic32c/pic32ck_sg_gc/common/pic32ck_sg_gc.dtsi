@@ -386,6 +386,30 @@
 			status = "disabled";
 		};
 
+		fuses: otp@a007000 {
+			compatible = "microchip,pic32ck-fuses";
+			reg = <0xa007000 0x1a8>;
+			status = "disabled";
+
+			nvmem-layout {
+				compatible = "fixed-layout";
+				#address-cells = <1>;
+				#size-cells = <1>;
+
+				/*
+				 * FCCFG72/FCCFG73 hold the MAC as a 48-bit
+				 * little-endian value, i.e. reversed with
+				 * respect to wire order. Consumers need
+				 * zephyr,mac-address-reversed.
+				 */
+				mac_address: mac-address@1a0 {
+					reg = <0x1a0 0x6>;
+					#nvmem-cell-cells = <0>;
+					read-only;
+				};
+			};
+		};
+
 		adc0: adc@45010000 {
 			compatible = "microchip,adc-g2";
 			reg = <0x45010000 0x5b>, <0xa007000 0x69>;

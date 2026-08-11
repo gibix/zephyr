@@ -1,0 +1,13 @@
+# Copyright (c) 2026 Arduino SA
+# SPDX-License-Identifier: Apache-2.0
+
+config OTP_MCHP_FUSES
+	bool "Microchip PIC32CK calibration/OTP fuse row driver"
+	default y
+	depends on DT_HAS_MICROCHIP_PIC32CK_FUSES_ENABLED
+	help
+	  Enable read access to the calibration/OTP fuse row (FUSES_CALOTP) of
+	  Microchip PIC32CK SG/GC SoCs.
+
+	  The row is provisioned during manufacturing, so the "program"
+	  operation is not supported.

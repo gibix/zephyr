@@ -32,6 +32,17 @@ properties:
       Can be combined with zephyr,random-mac-address or an NVMEM cell, for
       example to set the OUI.
 
+  zephyr,mac-address-reversed:
+    type: boolean
+    description: |
+      The MAC address in the NVMEM cell is stored in reverse octet order, that
+      is, least significant octet first. Some SoCs store it as a 48-bit
+      little-endian integer rather than as a byte array in wire order.
+
+      Only has an effect when combined with an NVMEM cell. When combined with
+      zephyr,mac-address-prefix, only the octets read from the cell are
+      reversed.
+
   phy-handle:
     type: phandle
     description: |

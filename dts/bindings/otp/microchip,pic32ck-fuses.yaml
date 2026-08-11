@@ -1,0 +1,19 @@
+# Copyright (c) 2026 Arduino SA
+# SPDX-License-Identifier: Apache-2.0
+
+title: Microchip PIC32CK calibration/OTP fuse row
+
+description: |
+  Read-only, memory-mapped fuse row (FUSES_CALOTP) of PIC32CK SG/GC SoCs,
+  holding factory-programmed data such as peripheral trim values and the
+  Ethernet MAC address. See the "Fuses" section of the family data sheet for
+  the layout.
+
+compatible: "microchip,pic32ck-fuses"
+
+include: base.yaml
+
+properties:
+  reg:
+    required: true
+    description: Start address and size of the fuse row.

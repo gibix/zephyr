@@ -8,4 +8,8 @@ source "boards/common/usb/Kconfig.cdc_acm_serial.defconfig"
 config USE_DT_CODE_PARTITION
 	default y
 
+# The MAC address lives in the SoC fuse row, reached through an NVMEM cell.
+configdefault OTP
+	default y if ETH_MCHP_GMAC_G1 && NVMEM
+
 endif # BOARD_ARDUINO_NANO_CHANDLER
