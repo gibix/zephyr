@@ -694,9 +694,23 @@ static void mchp_g2_ep0_state_idle(usbhs_registers_t *regs, struct udc_mchp_g2_d
 }
 
 /* STATUS_IN: Status ZLP ACKed by host. Guard on INTRTX[0] to ignore spurious events. */
-static void mchp_g2_ep0_state_status_in(struct udc_mchp_g2_data *priv,
-					uint16_t endpointTXInterrupts)
+static void mchp_g2_ep0_state_status_in(usbhs_registers_t *regs, struct udc_mchp_g2_data *priv,
+					uint8_t csr0L, uint16_t endpointTXInterrupts)
 {
+	if ((csr0L & USBHS_ENDPOINT0_CSR0L_RXPKTRDY_Msk) != 0U) {
+		/*
+		 * A new SETUP packet is already waiting in the FIFO. The status
+		 * ZLP completion and this SETUP have coalesced into a single
+		 * interrupt, so no further EP0 interrupt will be raised for the
+		 * SETUP. Returning here would leave RxPktRdy asserted and wedge
+		 * EP0 permanently. Drop back to IDLE and consume the SETUP now.
+		 */
+		priv->ep0_state = EP0_STATE_IDLE;
+		mchp_g2_ep0_state_idle(regs, priv, csr0L);
+		k_event_post(&priv->events, MCHP_G2_EVT_XFER);
+		return;
+	}
+
 	if ((endpointTXInterrupts & USBHS_INTRTX_EP0TX_Msk) == 0U) {
 		return; /* Not a real EP0 event. */
 	}
@@ -931,7 +945,7 @@ static void mchp_g2_handle_ep0_state(const struct device *dev, usbhs_registers_t
 		mchp_g2_ep0_state_idle(regs, priv, csr0L);
 		break;
 	case EP0_STATE_STATUS_IN:
-		mchp_g2_ep0_state_status_in(priv, endpointTXInterrupts);
+		mchp_g2_ep0_state_status_in(regs, priv, csr0L, endpointTXInterrupts);
 		break;
 	case EP0_STATE_TX:
 		mchp_g2_ep0_state_tx(priv, csr0L, endpointTXInterrupts);
