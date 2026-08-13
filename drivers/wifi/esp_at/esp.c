@@ -544,6 +544,63 @@ static void esp_dns_work(struct k_work *work)
 #endif
 }
 
+#if defined(CONFIG_WIFI_ESP_AT_VERSION_1_7)
+
+/*
+ * AT 1.7 has no plain "AT+CIPDNS" - the firmware only implements the _CUR/_DEF
+ * forms - and the query answers with one bare, unquoted address per line:
+ *
+ *   +CIPDNS_CUR:192.168.1.1
+ *   +CIPDNS_CUR:8.8.8.8
+ *   OK
+ *
+ * There is no leading "enable" field like in AT 2.x, so each invocation
+ * contributes a single server and they have to be accumulated.
+ */
+MODEM_CMD_DEFINE(on_cmd_cipdns)
+{
+#if defined(ESP_MAX_DNS)
+	struct esp_data *dev = CONTAINER_OF(data, struct esp_data,
+					    cmd_handler_data);
+	struct net_sockaddr_in *addrs = dev->dns_addresses;
+	char *server;
+	size_t idx = dev->dns_count;
+	int err;
+
+	if (argc < 1 || idx >= ESP_MAX_DNS) {
+		return 0;
+	}
+
+	server = str_unquote(argv[0]);
+	LOG_DBG("DNS[%zu]: %s", idx, server);
+
+	err = net_addr_pton(NET_AF_INET, server, &addrs[idx].sin_addr);
+	if (err) {
+		LOG_ERR("Invalid DNS address: %s", server);
+		return 0;
+	}
+
+	/* The module reports 0.0.0.0 for a slot the AP did not fill in. */
+	if (addrs[idx].sin_addr.s_addr == 0) {
+		return 0;
+	}
+
+	addrs[idx].sin_family = NET_AF_INET;
+	addrs[idx].sin_port = net_htons(53);
+	dev->dns_count = ++idx;
+
+	if (idx < ESP_MAX_DNS) {
+		addrs[idx].sin_addr.s_addr = 0;
+	}
+
+	k_work_submit(&dev->dns_work);
+#endif
+
+	return 0;
+}
+
+#else
+
 /* +CIPDNS:enable[,"DNS IP1"[,"DNS IP2"[,"DNS IP3"]]] */
 MODEM_CMD_DEFINE(on_cmd_cipdns)
 {
@@ -587,6 +644,8 @@ MODEM_CMD_DEFINE(on_cmd_cipdns)
 
 	return 0;
 }
+
+#endif /* CONFIG_WIFI_ESP_AT_VERSION_1_7 */
 
 static const struct modem_cmd response_cmds[] = {
 	MODEM_CMD("OK", on_cmd_ok, 0U, ""), /* 3GPP */
@@ -686,7 +745,11 @@ static void esp_ip_addr_work(struct k_work *work)
 		MODEM_CMD("+"_CIPSTA":", on_cmd_cipsta, 2U, ":"),
 	};
 	static const struct modem_cmd dns_cmds[] = {
-		MODEM_CMD_ARGS_MAX("+CIPDNS:", on_cmd_cipdns, 1U, 3U, ","),
+#if defined(CONFIG_WIFI_ESP_AT_VERSION_1_7)
+		MODEM_CMD("+"_CIPDNS":", on_cmd_cipdns, 1U, ","),
+#else
+		MODEM_CMD_ARGS_MAX("+"_CIPDNS":", on_cmd_cipdns, 1U, 3U, ","),
+#endif
 	};
 
 	ret = esp_cmd_send(dev, cmds, ARRAY_SIZE(cmds), "AT+"_CIPSTA"?",
@@ -710,8 +773,17 @@ static void esp_ip_addr_work(struct k_work *work)
 #endif
 
 	if (IS_ENABLED(CONFIG_WIFI_ESP_AT_DNS_USE)) {
+#if defined(ESP_MAX_DNS)
+		/* Start from a clean list: the AP may hand out fewer servers
+		 * than the previous association did.
+		 */
+		memset(dev->dns_addresses, 0, sizeof(dev->dns_addresses));
+#if defined(CONFIG_WIFI_ESP_AT_VERSION_1_7)
+		dev->dns_count = 0;
+#endif
+#endif
 		ret = esp_cmd_send(dev, dns_cmds, ARRAY_SIZE(dns_cmds),
-				   "AT+CIPDNS?", ESP_CMD_TIMEOUT);
+				   "AT+"_CIPDNS"?", ESP_CMD_TIMEOUT);
 		if (ret) {
 			LOG_WRN("DNS fetch failed: %d", ret);
 		}
@@ -1001,6 +1073,10 @@ MODEM_CMD_DEFINE(on_cmd_ready)
 static int cmd_version_log(struct modem_cmd_handler_data *data,
 			   const char *type, const char *version)
 {
+	ARG_UNUSED(data);
+	ARG_UNUSED(type);
+	ARG_UNUSED(version);
+
 	LOG_INF("%s: %s", type, version);
 
 	return 0;
@@ -1008,6 +1084,17 @@ static int cmd_version_log(struct modem_cmd_handler_data *data,
 
 MODEM_CMD_DEFINE(on_cmd_at_version)
 {
+	struct esp_data *dev = CONTAINER_OF(data, struct esp_data, cmd_handler_data);
+	size_t vlen;
+
+	/* AT+GMR reports e.g. "1.7.5.0(bcc2ce3)"; keep only the version itself. */
+	vlen = strcspn(argv[0], "(\r\n");
+	if (vlen >= sizeof(dev->at_version)) {
+		vlen = sizeof(dev->at_version) - 1;
+	}
+	memcpy(dev->at_version, argv[0], vlen);
+	dev->at_version[vlen] = '\0';
+
 	return cmd_version_log(data, "AT version", argv[0]);
 }
 
@@ -1323,6 +1410,20 @@ static int esp_mgmt_connect(const struct device *dev,
 	return 0;
 }
 
+#if defined(CONFIG_WIFI_ESP_AT_FETCH_VERSION)
+static int esp_mgmt_get_version(const struct device *dev,
+				struct wifi_version *params)
+{
+	struct esp_data *data = dev->data;
+
+	/* Must not point at stack memory, so hand out the driver's own copy. */
+	params->fw_version = data->at_version;
+	params->drv_version = "esp_at";
+
+	return 0;
+}
+#endif
+
 static int esp_mgmt_disconnect(const struct device *dev)
 {
 	struct esp_data *data = dev->data;
@@ -1570,6 +1671,9 @@ static const struct wifi_mgmt_ops esp_mgmt_ops = {
 	.ap_enable	   = esp_mgmt_ap_enable,
 	.ap_disable	   = esp_mgmt_ap_disable,
 	.iface_status	   = esp_mgmt_iface_status,
+#if defined(CONFIG_WIFI_ESP_AT_FETCH_VERSION)
+	.get_version	   = esp_mgmt_get_version,
+#endif
 };
 
 static const struct net_wifi_mgmt_offload esp_api = {

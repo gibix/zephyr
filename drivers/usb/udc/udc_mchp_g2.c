@@ -360,6 +360,9 @@ static void mchp_g2_handle_ep0_tx(const struct device *dev, struct net_buf *buf)
 	if (buf->len == 0 && udc_get_buf_info(buf)->zlp == 0U) {
 		csr0 |= USBHS_ENDPOINT0_CSR0L_PERIPHERAL_EP0_DATAEND_Msk;
 	}
+	printk("EP0TX chunk=%u rem=%u zlp=%u de=%u\n", (unsigned int)chunk,
+	       (unsigned int)buf->len, udc_get_buf_info(buf)->zlp,
+	       (csr0 & USBHS_ENDPOINT0_CSR0L_PERIPHERAL_EP0_DATAEND_Msk) ? 1U : 0U);
 
 	priv->ep0_state = EP0_STATE_TX;
 	regs->ENDPOINT0.USBHS_CSR0L |= csr0;
@@ -691,6 +694,9 @@ static void mchp_g2_ep0_state_idle(usbhs_registers_t *regs, struct udc_mchp_g2_d
 	}
 
 	k_event_post(&priv->events, MCHP_G2_EVT_SETUP);
+	printk("SETUP %02x %02x val=%04x idx=%04x wLen=%u\n", priv->setup[0], priv->setup[1],
+	       (unsigned int)(priv->setup[2] | (priv->setup[3] << 8)),
+	       (unsigned int)(priv->setup[4] | (priv->setup[5] << 8)), wLen);
 }
 
 /* STATUS_IN: Status ZLP ACKed by host. Guard on INTRTX[0] to ignore spurious events. */

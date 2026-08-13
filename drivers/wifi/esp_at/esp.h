@@ -30,6 +30,7 @@ extern "C" {
 #define _CWJAP  "CWJAP_CUR"
 #define _CIPSTA "CIPSTA_CUR"
 #define _CIPSTAMAC "CIPSTAMAC_CUR"
+#define _CIPDNS "CIPDNS_CUR"
 #define _CIPRECVDATA "+CIPRECVDATA,"
 #define _CIPRECVDATA_END ':'
 #else
@@ -38,6 +39,7 @@ extern "C" {
 #define _CWJAP  "CWJAP"
 #define _CIPSTA "CIPSTA"
 #define _CIPSTAMAC "CIPSTAMAC"
+#define _CIPDNS "CIPDNS"
 #define _CIPRECVDATA "+CIPRECVDATA:"
 #define _CIPRECVDATA_END ','
 #endif
@@ -214,6 +216,8 @@ enum esp_data_flag {
 };
 
 /* driver data */
+#define ESP_AT_VERSION_MAX_LEN 24
+
 struct esp_data {
 	struct net_if *net_iface;
 
@@ -259,6 +263,19 @@ struct esp_data {
 	struct k_work dns_work;
 
 	scan_result_cb_t scan_cb;
+#if defined(ESP_MAX_DNS) && defined(CONFIG_WIFI_ESP_AT_VERSION_1_7)
+	/* AT 1.7 reports one DNS server per response line, so they have to be
+	 * accumulated across several invocations of the +CIPDNS_CUR handler.
+	 */
+	size_t dns_count;
+#endif
+#if defined(CONFIG_WIFI_ESP_AT_FETCH_VERSION)
+	/* "AT version:" string reported by AT+GMR, truncated to the leading
+	 * dotted-quad (e.g. "1.7.5.0"). Kept so wifi_mgmt_ops::get_version can
+	 * hand it out without re-issuing the command.
+	 */
+	char at_version[ESP_AT_VERSION_MAX_LEN];
+#endif
 	struct wifi_iface_status *wifi_status;
 	struct k_sem wifi_status_sem;
 

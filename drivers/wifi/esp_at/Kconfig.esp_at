@@ -176,11 +176,12 @@ config WIFI_ESP_AT_CIPDINFO_USE
 	  Enable AT+CIPDINFO to get peer ip-address and port.
 
 config WIFI_ESP_AT_FETCH_VERSION
-	bool "Fetch and log ESP-AT firmware version"
+	bool "Fetch ESP-AT firmware version"
 	default y
-	depends on LOG
 	help
 	  Fetch information about ESP-AT firmware version. This includes AT
-	  command version, SDK (ESP-IDF), board and compile time.
+	  command version, SDK (ESP-IDF), board and compile time. The AT command
+	  version is retained and reported through NET_REQUEST_WIFI_VERSION, so
+	  this is useful even when logging is disabled.
 
 endif # WIFI_ESP_AT

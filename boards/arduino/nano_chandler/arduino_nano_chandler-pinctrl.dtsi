@@ -23,7 +23,7 @@
 		};
 	};
 
-	/* UART6 -> user header (J4). */
+	/* UART6 -> user header (J4). Zephyr console / shell. */
 	sercom6_uart_default: sercom6_uart_default {
 		group1 {
 			pinmux = <PA0D_SERCOM6_PAD0>,	/* TX */
